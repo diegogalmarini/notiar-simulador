@@ -1,0 +1,32 @@
+{
+  "name": "ingesis-tutor-dataset-builder",
+  "version": "1.0.0",
+  "description": "Descarga y procesamiento del manual de Ingesis para crear dataset de fine-tuning LLM",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "scrape": "node src/scraper.js",
+    "process": "node src/processor.js",
+    "prepare-dataset": "node src/dataset-builder.js",
+    "full-pipeline": "npm run scrape && npm run process && npm run prepare-dataset"
+  },
+  "keywords": [
+    "ingesis",
+    "web-scraping",
+    "puppeteer",
+    "llm",
+    "fine-tuning",
+    "dataset"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "cheerio": "^1.0.0",
+    "fs-extra": "^11.2.0",
+    "p-limit": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
