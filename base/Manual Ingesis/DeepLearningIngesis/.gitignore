@@ -1,9 +1,0 @@
-node_modules/
-data/raw/**
-data/processed/**
-data/dataset/**
-*.log
-.env
-.DS_Store
-dist/
-*.tmp
