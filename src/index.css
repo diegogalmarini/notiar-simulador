@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos base para el simulador */
+body {
+  background-color: #d4d0c8;
+}
