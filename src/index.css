@@ -78,6 +78,10 @@ body {
   cursor: default;
   box-shadow: none;
   border-color: #a0a0a0;
+  opacity: 0.6; /* Hacerlo más evidente */
+}
+.win-btn:disabled svg {
+  filter: grayscale(100%); /* Desactivar color de iconos */
 }
 
 /* Fieldset (Marco de grupo) */

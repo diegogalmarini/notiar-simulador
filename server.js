@@ -12,126 +12,97 @@ const db = new sqlite3.Database('./simulador_ingesis.db');
 
 // --- ENDPOINTS ---
 
-// 1. BUSCAR CLIENTE (Gatekeeper)
+// 1. BUSCAR CLIENTE
 app.get('/api/buscar-cliente', (req, res) => {
-    const queryTerm = req.query.q || '';
-    console.log(`[BUSCAR] Termino: '${queryTerm}'`);
+    const q = req.query.q;
+    if (!q) return res.json([]);
 
-    const sql = `
-        SELECT 
-            id, tipo_persona, sexo, apellido, nombres, 
-            tipo_doc, nro_doc, 
-            domicilio, localidad, cp, email, telefono,
-            nacionalidad, fecha_nacimiento, nombre_padre, nombre_madre,
-            estado_civil, nupcias, id_conyuge, nombre_conyuge_visual
-        FROM clientes_simulacion 
-        WHERE (nro_doc LIKE ? OR apellido LIKE ? OR nombres LIKE ?)
-        LIMIT 50
-    `;
-
-    const searchPattern = `%${queryTerm}%`;
-
-    db.all(sql, [searchPattern, searchPattern, searchPattern], (err, rows) => {
-        if (err) {
-            console.error("Error en búsqueda:", err);
-            return res.status(500).json({ error: "Error en base de datos" });
-        }
-        res.json(rows);
-    });
+    setTimeout(() => {
+        const sql = `
+            SELECT * FROM clientes_simulacion 
+            WHERE nro_doc = ? OR cuit = ? OR apellido LIKE ?
+            LIMIT 50
+        `;
+        db.all(sql, [q, q, `${q}%`], (err, rows) => {
+            if (err) return res.status(500).json({ error: 'Error DB' });
+            res.json(rows);
+        });
+    }, 100); // Small latency
 });
 
-// 2. CREAR CLIENTE (Con Latencia y Validación)
+// 2. CREAR CLIENTE
 app.post('/api/clientes', (req, res) => {
     const data = req.body;
-    console.log(`[CREAR] Solicitud para: ${data.apellido}, ${data.nombres} (${data.nro_doc})`);
 
-    // 1. SIMULACIÓN DE LATENCIA (3s)
-    setTimeout(() => {
+    // Strict validation
+    const checkSql = `SELECT id FROM clientes_simulacion WHERE nro_doc = ?`;
+    db.get(checkSql, [data.nro_doc], (err, row) => {
+        if (err) return res.status(500).json({ error: 'DB Error' });
+        if (row) return res.status(409).json({ error: 'DUPLICADO: Documento existente.' });
 
-        // 2. VALIDACIÓN DE DUPLICADOS (DNI)
-        const checkQuery = "SELECT id FROM clientes_simulacion WHERE nro_doc = ?";
-        db.get(checkQuery, [data.nro_doc], (err, row) => {
-            if (err) return res.status(500).json({ error: "Error interno al validar." });
+        const sql = `
+            INSERT INTO clientes_simulacion (
+                tipo_persona, sexo, apellido, variante, nombres,
+                tipo_doc, nro_doc, cuit,
+                nacionalidad, fecha_nacimiento, lugar_nacimiento, profesion,
+                calle, altura, piso, dpto, cp, localidad, provincia,
+                email, telefono,
+                nombre_padre, nombre_madre, estado_civil, nupcias, id_conyuge, nombre_conyuge_visual,
+                observaciones
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-            if (row) {
-                return res.status(409).json({
-                    error: "ATENCIÓN: Ya existe una persona con ese Documento.",
-                    tipo: "DUPLICATE_ENTRY"
-                });
-            }
+        const params = [
+            data.tipo_persona || 'Fisica', data.sexo, data.apellido, data.variante, data.nombres,
+            data.tipo_doc, data.nro_doc, data.cuit,
+            data.nacionalidad, data.fecha_nacimiento, data.lugar_nacimiento, data.profesion,
+            data.calle, data.altura, data.piso, data.dpto, data.cp, data.localidad, data.provincia || 'Buenos Aires',
+            data.email, data.telefono,
+            data.nombre_padre, data.nombre_madre, data.estado_civil, data.nupcias, data.id_conyuge, data.nombre_conyuge_visual,
+            data.observaciones
+        ];
 
-            // 3. INSERTAR SI ES NUEVO
-            const insertQuery = `
-                INSERT INTO clientes_simulacion (
-                    tipo_persona, sexo, apellido, nombres, 
-                    tipo_doc, nro_doc, 
-                    domicilio, localidad, cp, email, telefono,
-                    nacionalidad, fecha_nacimiento, nombre_padre, nombre_madre,
-                    estado_civil, nupcias, id_conyuge, nombre_conyuge_visual
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-
-            const params = [
-                data.tipo_persona || 'Fisica', data.sexo, data.apellido, data.nombres,
-                data.tipo_doc || 'DNI', data.nro_doc,
-                data.domicilio, data.localidad, data.cp, data.email, data.telefono,
-                data.nacionalidad, data.fecha_nacimiento, data.nombre_padre, data.nombre_madre,
-                data.estado_civil, data.nupcias, data.id_conyuge, data.nombre_conyuge_visual
-            ];
-
-            db.run(insertQuery, params, function (err) {
-                if (err) {
-                    console.error("Error al insertar:", err.message);
-                    return res.status(500).json({ error: "Error interno al guardar." });
-                }
-                console.log(`Cliente creado con ID: ${this.lastID}`);
-                res.json({ success: true, id: this.lastID });
-            });
+        db.run(sql, params, function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: this.lastID, message: 'OK' });
         });
-
-    }, 3000); // 3 SEGUNDOS DE ESPERA OBLIGATORIA
+    });
 });
 
 // 3. ACTUALIZAR CLIENTE
 app.put('/api/clientes/:id', (req, res) => {
     const id = req.params.id;
     const data = req.body;
-    console.log(`[ACTUALIZAR] ID: ${id}`);
 
-    setTimeout(() => {
-        const updateQuery = `
-            UPDATE clientes_simulacion SET
-                tipo_persona = ?, sexo = ?, apellido = ?, nombres = ?, 
-                tipo_doc = ?, nro_doc = ?, 
-                domicilio = ?, localidad = ?, cp = ?, email = ?, telefono = ?,
-                nacionalidad = ?, fecha_nacimiento = ?, nombre_padre = ?, nombre_madre = ?,
-                estado_civil = ?, nupcias = ?, id_conyuge = ?, nombre_conyuge_visual = ?
-            WHERE id = ?
-        `;
+    const sql = `
+        UPDATE clientes_simulacion SET
+            tipo_persona=?, sexo=?, apellido=?, variante=?, nombres=?,
+            tipo_doc=?, nro_doc=?, cuit=?,
+            nacionalidad=?, fecha_nacimiento=?, lugar_nacimiento=?, profesion=?,
+            calle=?, altura=?, piso=?, dpto=?, cp=?, localidad=?, provincia=?,
+            email=?, telefono=?,
+            nombre_padre=?, nombre_madre=?, estado_civil=?, nupcias=?, id_conyuge=?, nombre_conyuge_visual=?,
+            observaciones=?
+        WHERE id = ?
+    `;
 
-        const params = [
-            data.tipo_persona, data.sexo, data.apellido, data.nombres,
-            data.tipo_doc, data.nro_doc,
-            data.domicilio, data.localidad, data.cp, data.email, data.telefono,
-            data.nacionalidad, data.fecha_nacimiento, data.nombre_padre, data.nombre_madre,
-            data.estado_civil, data.nupcias, data.id_conyuge, data.nombre_conyuge_visual,
-            id
-        ];
+    const params = [
+        data.tipo_persona, data.sexo, data.apellido, data.variante, data.nombres,
+        data.tipo_doc, data.nro_doc, data.cuit,
+        data.nacionalidad, data.fecha_nacimiento, data.lugar_nacimiento, data.profesion,
+        data.calle, data.altura, data.piso, data.dpto, data.cp, data.localidad, data.provincia,
+        data.email, data.telefono,
+        data.nombre_padre, data.nombre_madre, data.estado_civil, data.nupcias, data.id_conyuge, data.nombre_conyuge_visual,
+        data.observaciones,
+        id
+    ];
 
-        db.run(updateQuery, params, function (err) {
-            if (err) {
-                console.error("Error al actualizar:", err.message);
-                if (err.message.includes('UNIQUE constraint failed')) {
-                    return res.status(409).json({ error: "El Documento ya pertenece a otro cliente." });
-                }
-                return res.status(500).json({ error: "Error interno al actualizar." });
-            }
-            res.json({ success: true, id: id });
-        });
-    }, 3000);
+    db.run(sql, params, function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, id });
+    });
 });
 
-// --- INICIAR SERVIDOR ---
 app.listen(PORT, () => {
-    console.log(`Servidor simulador corriendo en http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });

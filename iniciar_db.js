@@ -2,52 +2,64 @@ import sqlite3 from 'sqlite3';
 const db = new sqlite3.Database('./simulador_ingesis.db');
 
 const schema = `
-CREATE TABLE IF NOT EXISTS clientes_simulacion (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    
-    -- PESTAÑA 1: DATOS PRINCIPALES
-    tipo_persona TEXT DEFAULT 'Fisica', -- 'Fisica' o 'Juridica'
-    sexo TEXT,                          -- 'M' o 'F' (Radio Button)
-    apellido TEXT NOT NULL,
-    nombres TEXT NOT NULL,
-    
-    -- PESTAÑA 2: CONTACTO
-    domicilio TEXT,                     -- Calle y Altura
-    localidad TEXT,
-    cp TEXT,                            -- Código Postal
-    email TEXT,                         -- Se usa para reportes automáticos
-    telefono TEXT,
+    CREATE TABLE IF NOT EXISTS clientes_simulacion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        
+        -- GROUP: IDENTITY
+        tipo_persona TEXT DEFAULT 'Fisica',
+        sexo TEXT,                          -- Radio: 'M' or 'F'
+        apellido TEXT NOT NULL,
+        variante TEXT,                      -- Alias/Maiden Name
+        nombres TEXT NOT NULL,
+        
+        -- GROUP: LEGAL DOCS
+        tipo_doc TEXT DEFAULT 'DNI',
+        nro_doc TEXT UNIQUE NOT NULL,       -- Constraint: Unique Key
+        cuit TEXT,                          -- Tax ID
+        
+        -- GROUP: BIOGRAPHY
+        nacionalidad TEXT,
+        fecha_nacimiento DATE,
+        lugar_nacimiento TEXT,              -- Place of Birth
+        profesion TEXT,                     -- Mandatory
+        
+        -- GROUP: ADDRESS - ATOMIZED
+        calle TEXT,
+        altura TEXT,
+        piso TEXT,
+        dpto TEXT,
+        cp TEXT,
+        localidad TEXT,
+        provincia TEXT DEFAULT 'Buenos Aires',
+        
+        -- GROUP: CONTACT
+        email TEXT,
+        telefono TEXT,
 
-    -- PESTAÑA 3: DATOS PERSONALES / FILIACIÓN
-    tipo_doc TEXT DEFAULT 'DNI',        -- 'DNI', 'LE', 'LC', 'PAS', 'CUIT'
-    nro_doc TEXT UNIQUE NOT NULL,       -- CLAVE ÚNICA (Validación Crítica)
-    nacionalidad TEXT,
-    fecha_nacimiento DATE,
-    nombre_padre TEXT,
-    nombre_madre TEXT,
-
-    -- LÓGICA DE ESTADO CIVIL (COMPLEJA)
-    estado_civil TEXT,                  -- 'Soltero', 'Casado', 'Divorciado', 'Viudo'
-    nupcias TEXT,                       -- Solo editable si estado_civil == 'Casado'
-    
-    -- VINCULACIÓN DE CÓNYUGE (Recursividad)
-    id_conyuge INTEGER,                 -- ID de otro registro en esta misma tabla
-    nombre_conyuge_visual TEXT,         -- Nombre concatenado para mostrar en el input (Read-Only)
-    
-    fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+        -- GROUP: LINKS
+        nombre_padre TEXT,
+        nombre_madre TEXT,
+        estado_civil TEXT,
+        nupcias TEXT,
+        id_conyuge INTEGER,
+        nombre_conyuge_visual TEXT,
+        
+        -- GROUP: META
+        observaciones TEXT,
+        fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 `;
 
 db.serialize(() => {
-    // Drop table if exists to ensure clean slate for the new schema
+    // ACTION: DESTROY current schema as requested
     db.run("DROP TABLE IF EXISTS clientes_simulacion");
-    db.run("DROP TABLE IF EXISTS clientes"); // Remove old table
+    db.run("DROP TABLE IF EXISTS clientes");
 
     db.run(schema, (err) => {
         if (err) {
-            console.error("Error creando tabla:", err.message);
+            console.error("Error creating table:", err.message);
         } else {
-            console.log("Base de datos simulada creada correctamente (Tabla: clientes_simulacion).");
+            console.log("Database initialized. Table: clientes_simulacion");
         }
     });
 });
